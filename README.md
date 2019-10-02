@@ -7,6 +7,8 @@ I play with a DJ Controller as a hobby, mixing music for fun. (SoundCloud plug, 
 * Spotipy - https://github.com/plamere/spotipy
 * Google API Client Library for Python - https://developers.google.com/youtube/v3/quickstart/python
 * YouTube-DL: https://ytdl-org.github.io/youtube-dl/index.html
+* py2exe - https://stackoverflow.com/questions/5458048/how-to-make-a-python-script-standalone-executable-to-run-without-any-dependency
+* Selenium
 
 
 ## Future additions
