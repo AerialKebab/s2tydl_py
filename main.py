@@ -32,39 +32,134 @@ from multiprocessing import Pool, Process
 #and https://github.com/plamere/spotipy/blob/master/spotipy/oauth2.py
 
 def window():
-    client_id = "ee2b08265749477a8b156339bdfa0de5"
-    client_secret = "bfb44ef7d7084c4ab78bbe25bb14eb47"
+    client_id = "4eacb90864a74bc49e17a90d591723d7"
+    client_secret = "f22221c21ede49e989f67e69ff5d4db6"
     redirect_uri = "http://localhost:3000/redirect"
     scope = 'playlist-read-private playlist-read-collaborative'
+    playlistJSON = None;
 
     def executeStates(gridIn):
         grid = gridIn
         def mainMenu(username, token):
             def updateUsers():
                 users = None
-                with open("users.json", "r") as input:
+                with open("./caches/users.json", "r") as input:
                     users = json.load(input)
                 userJSONEntry = { username : "" }
                 if userJSONEntry not in users['users']:
                     users['users'].append({
                         username : ""
                     })
-                with open("users.json", "w+") as output:
+                with open("./caches/users.json", "w+") as output:
                     users['latest'] = username
                     json.dump(users,output)
 
             def getToken():
-                cache_path = ".cache-" + username
+                cache_path = "./caches/.cache-" + username
                 sp_oauth = oauth2.SpotifyOAuth(client_id, client_secret, redirect_uri, scope=scope, cache_path=cache_path)
                 token_info = sp_oauth.get_cached_token()
                 token = token_info['access_token']
                 return token
 
-            def printPlaylists(playlists,playlistJSON):
+            def getPlaylists(playlists):
+                playlistForm = QFormLayout()
+                scrollPlaylists = QtWidgets.QScrollArea()
+                groupBox = QGroupBox("Playlists")
+                # buttonList = []
                 for playlist in playlists['items']:
-                    print playlist['name']
-                        #TODO: print playlist pic?
-                        # print playlist['name'] - "  total tracks: " + str(playlist['tracks']['total'])
+                    if playlist['name'] not in playlistJSON:
+                        #TODO: fix playlist name repeats, input (3) change to ID?
+                        playlistJSON[playlist['name']] = []
+                        playlistJSON[playlist['name']].append({
+                            'toDownload':0,
+                            'numOfSongs':playlist['tracks']['total'],
+                            'lastUpdated':0,
+                            'songs': []
+                        })
+                    playlistJSON[playlist['name']][0]['numOfSongs'] = playlist['tracks']['total']
+                    #TODO: New songs added
+
+                    toDownload = QCheckBox()
+                    if playlistJSON[playlist['name']][0]['toDownload'] == 1:
+                        toDownload.setChecked(True)
+
+                    playlistForm.addRow(toDownload,QLabel(playlist['name']))
+
+                groupBox.setLayout(playlistForm)
+                scrollPlaylists.setWidget(groupBox)
+                scrollPlaylists.setWidgetResizable(True)
+                grid.addWidget(scrollPlaylists,1,0)
+
+                # https://doc.qt.io/qt-5/qformlayout.html
+
+                dl = QPushButton('Download Playlists')
+                dl.clicked.connect(downloadPlaylists)
+                grid.addWidget(dl,2,0)
+
+            def downloadPlaylists():
+                # print grid.itemAtPosition(1,0).widget().widget().layout().rowCount()
+                #QScrollArea/QGroupBox/QFormLayout (QFormLayout has rows)
+                #TODO Downloading screen
+
+                playlistRows = grid.itemAtPosition(1,0).widget().widget().layout()
+
+                for i in range(playlistRows.rowCount()):
+                    row = playlistRows.itemAt(i,0).widget()
+                    playlistName = playlistRows.itemAt(i,1).widget().text()
+                    if row.isChecked():
+                        playlistJSON[playlistName][0]['toDownload'] = 1
+                        # updatePlaylistEntry(playlistName) #TODO
+                    else:
+                        playlistJSON[playlistName][0]['toDownload'] = 0
+
+                with open("./downloadLogs/" + username + "downloadLog.json", "w+") as output:
+                    json.dump(playlistJSON,output)
+
+            # def updatePlaylistEntry(playlistName):
+            #     def insert_tracks_newPlaylist(tracks, songList):
+            #         for i, item in enumerate(tracks['items']):
+            #             track = item['track']
+            #
+            #             # print item['added_at']
+            #
+            #             songList.append({
+            #                 track['id']: track['artists'][0]['name'] + " - " + track['name'],
+            #                 'added_at': item['added_at']
+            #             })
+            #
+            #             trackName = track['artists'][0]['name'] + " - " + track['name']
+            #             # print trackName
+            #             downloadVideo(findFirstYouTubeResult(track['artists'][0]['name'] + " - " + track['name']), trackName)
+            #
+            #     def insert_new_tracks(tracks, songList):
+            #         for i, item in enumerate(tracks['items']):
+            #             if item['added_at'] > playlistJSON[playlist['name']][0]['lastUpdated'] : ###
+            #                 track = item['track']
+            #                 songList.append({
+            #                     track['id']: track['artists'][0]['name'] + " - " + track['name'],
+            #                     'added_at': item['added_at']
+            #                 })
+            #                 playlistJSON[playlist['name']][0]['lastUpdated'] = item['added_at'];
+            #                 trackName = track['artists'][0]['name'] + " - " + track['name']
+            #                 print trackName
+            #
+            #                 downloadVideo(findFirstYouTubeResult(track['artists'][0]['name'] + " - " + track['name'] + "(Official Audio)"), trackName)
+            #
+            #     songList = []
+            #     results = sp.user_playlist(username, playlist['id'],fields="tracks,next")
+            #     tracks = results['tracks']
+            #
+            #     insert_tracks_newPlaylist(tracks,songList)
+            #     while tracks['next']:
+            #         tracks = sp.next(tracks)
+            #         insert_tracks_newPlaylist(tracks,songList)
+            #
+            #     songList.sort(key=operator.itemgetter('added_at'))
+            #     playlistJSON[playlistName]['songs'] = songList
+            #
+            #     # TODO
+            #     # if playlist['tracks']['total'] != 0:
+            #     #     playlistJSON[playlist['name']][0]['lastUpdated'] = playlistJSON[playlist['name']][1]['songs'][playlist['tracks']['total'] - 1]['added_at'] #lastelement
 
             clearGrid()
             grid.addWidget(QLabel("Select Playlists to Download"),0,0)
@@ -74,32 +169,24 @@ def window():
                 token = getToken()
 
             sp = spotipy.Spotify(token)
-            # print sp.me()['id']
             playlists = sp.user_playlists(sp.me()['id'])
 
-            if not path.exists("downloadLog.json"):
-                open("downloadLog.json","w+")
-            if os.stat("downloadLog.json").st_size != 0:
-                with open("downloadLog.json", "r") as input:
+            if not path.exists("./downloadLogs/" + username + "downloadLog.json"):
+                open("./downloadLogs/" + username + "downloadLog.json","w+")
+            if os.stat("./downloadLogs/" + username + "downloadLog.json").st_size != 0:
+                with open("./downloadLogs/" + username + "downloadLog.json", "r") as input:
                     playlistJSON = json.load(input)
             else:
                 playlistJSON = {}
 
-
-
-            printPlaylists(playlists,playlistJSON)
-
-            #TODO: Show playlists such that they can be checked and unchecked
-            #      "Download & Update button on the bottom right"
-            #       Download & update page (No buttons allowed) & its redirection to the mainmenu page afterwards
-
+            getPlaylists(playlists)
 
         def clearGrid():
             for i in reversed(range(grid.count())):
                 grid.itemAt(i).widget().setParent(None)
 
         def waitingSpotifyVerif(username):
-            cache_path = None or ".cache-" + username
+            cache_path = None or "./caches/.cache-" + username
             sp_oauth = oauth2.SpotifyOAuth(client_id, client_secret, redirect_uri, scope=scope, cache_path=cache_path)
             token_info = sp_oauth.get_cached_token()
 
@@ -135,7 +222,7 @@ def window():
                 clearGrid()
 
                 users = None
-                with open("users.json", "r") as input:
+                with open("./caches/users.json", "r") as input:
                     users = json.load(input)
                 userJSONEntry = { spotify_user.text() : "" }
 
@@ -149,14 +236,14 @@ def window():
 
             name = None
             #if no file named lastUser do not fill in the entry text
-            if os.path.exists('./users.json') and os.stat("users.json").st_size != 0:
-                with open("users.json", "r") as input:
+            if os.path.exists('./caches/users.json') and os.stat("./caches/users.json").st_size != 0:
+                with open("./caches/users.json", "r") as input:
                     users = json.load(input)
                 if not users == {}:
                     name = users['latest']
 
             else:
-                with open("users.json", "w+") as output:
+                with open("./caches/users.json", "w+") as output:
                     users = {"latest":"","users":[]}
                     json.dump(users,output)
 
@@ -166,10 +253,12 @@ def window():
             grid.addWidget(spotify_user,0,1);
             pybutton = QPushButton('Go!')
             pybutton.clicked.connect(clickMethod)
+            #TODO: Show playlists such that they can be checked and unchecked
+            #      "Download & Update button on the bottom right"
+            #       Download & update page (No buttons allowed) & its redirection to the mainmenu page afterwardsMethod)
             grid.addWidget(pybutton,0,2)
 
         enterSpotifyAcc()
-
 
     def center():
         frameGm = win.frameGeometry()
