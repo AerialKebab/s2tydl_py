@@ -38,42 +38,32 @@ from multiprocessing import Pool, Process
 class downloadObject(QtCore.QObject):
     finished = pyqtSignal()
 
+    def getMiscDataJSON(self, playlistJSON, sp, username):
+        self.playlistJSON = playlistJSON
+        self.sp = sp
+        self.username = username
+
     def downloadPlaylists(self):
-        count = 0
-        while count < 3:
-            time.sleep(1)
-            print("Loop")
-            count += 1
+        playlistRows = grid.itemAtPosition(1,0).widget().widget().layout()
+        for i in range(playlistRows.rowCount()):
+            row = playlistRows.itemAt(i,0).widget()
+            playlistName = playlistRows.itemAt(i,1).widget().text()
+            if row.isChecked():
+                self.playlistJSON[playlistName][0]['toDownload'] = 1
+                self.updatePlaylistEntry(self.playlistJSON[playlistName][0]['playlistID'],playlistName)
+            else:
+                self.playlistJSON[playlistName][0]['toDownload'] = 0
+
+        with open("./downloadLogs/" + self.username + "downloadLog.json", "w+") as output:
+            json.dump(self.playlistJSON,output)
         self.finished.emit()
 
-    # def downloadPlaylists(self):
-    #     # print grid.itemAtPosition(1,0).widget().widget().layout().rowCount()
-    #     #QScrollArea/QGroupBox/QFormLayout (QFormLayout has rows)
-    #
-    #     playlistRows = self.grid.itemAtPosition(1,0).widget().widget().layout()
-    #
-    #     for i in range(playlistRows.rowCount()):
-    #         row = playlistRows.itemAt(i,0).widget()
-    #         playlistName = playlistRows.itemAt(i,1).widget().text()
-    #         if row.isChecked():
-    #             playlistJSON[playlistName][0]['toDownload'] = 1
-    #             updatePlaylistEntry(playlistJSON[playlistName][0]['playlistID'],playlistName)
-    #         else:
-    #             playlistJSON[playlistName][0]['toDownload'] = 0
-    #
-    #     with open("./downloadLogs/" + username + "downloadLog.json", "w+") as output:
-    #         json.dump(playlistJSON,output)
-    #
-    #     self.finished.emit()
 
-        # mainMenu(username,None)
 
-    def updatePlaylistEntry(playlistID, playlistName):
+    def updatePlaylistEntry(self, playlistID, playlistName):
         def insert_tracks_newPlaylist(tracks, songList):
             for i, item in enumerate(tracks['items']):
                 track = item['track']
-
-                # print item['added_at']
 
                 songList.append({
                     track['id']: track['artists'][0]['name'] + " - " + track['name'],
@@ -83,9 +73,8 @@ class downloadObject(QtCore.QObject):
                 trackName = track['artists'][0]['name'] + " - " + track['name']
 
                 # downloadVideo(findFirstYouTubeResult(track['artists'][0]['name'] + " - " + track['name']), trackName)
-
         songList = []
-        results = sp.user_playlist(username, playlistID, fields="tracks,next")
+        results = self.sp.user_playlist(self.username, playlistID, fields="tracks,next")
         tracks = results['tracks']
 
         insert_tracks_newPlaylist(tracks,songList)
@@ -94,13 +83,14 @@ class downloadObject(QtCore.QObject):
             insert_tracks_newPlaylist(tracks,songList)
 
         songList.sort(key=operator.itemgetter('added_at'))
-        playlistJSON[playlistName][0]['songs'] = songList
+        self.playlistJSON[playlistName][0]['songs'] = songList
 
         # mainMenu(username, None)
 
         # TODO
         # if playlist['tracks']['total'] != 0:
         #     playlistJSON[playlist['name']][0]['lastUpdated'] = playlistJSON[playlist['name']][1]['songs'][playlist['tracks']['total'] - 1]['added_at'] #lastelement
+
 
     def downloadVideo(input,trackName):
         path = './downloaded/' + trackName + '.%(ext)s'
@@ -127,7 +117,6 @@ class downloadObject(QtCore.QObject):
 
         # def __init__():
 
-
 class main(QtCore.QObject):
     signalStartDownloadingPlaylists = QtCore.pyqtSignal()
 
@@ -140,6 +129,7 @@ class main(QtCore.QObject):
 
     app = QApplication(sys.argv)
     win = QWidget()
+    global grid #grid is global becaused it needs to be accessed by class downloadObject()
     grid = QGridLayout()
 
     # thread = None
@@ -167,7 +157,7 @@ class main(QtCore.QObject):
                 token = token_info['access_token']
                 return token
 
-            def getPlaylists(playlists):
+            def getPlaylists(playlists, sp):
                 def downloading():
                     self.thread.start()
                     grid.itemAtPosition(2,0).widget().setText("Downloading Playlists")
@@ -206,6 +196,7 @@ class main(QtCore.QObject):
                 # https://doc.qt.io/qt-5/qformlayout.html
 
                 self.worker = downloadObject()
+                self.worker.getMiscDataJSON(playlistJSON, sp, username)
                 self.thread = QtCore.QThread()
                 self.worker.moveToThread(self.thread)
                 self.worker.finished.connect(self.thread.quit)
@@ -237,7 +228,7 @@ class main(QtCore.QObject):
             else:
                 playlistJSON = {}
 
-            getPlaylists(playlists)
+            getPlaylists(playlists, sp)
 
         def clearGrid():
             for i in reversed(range(grid.count())):
@@ -326,8 +317,8 @@ class main(QtCore.QObject):
         self.win.move(frameGm.topLeft())
 
     def window(self):
-        self.executeStates(self.grid)
-        self.win.setLayout(self.grid)
+        self.executeStates(grid)
+        self.win.setLayout(grid)
         self.win.setWindowTitle("S2YTDL - by AerialKebab")
         self.win.setGeometry(50,50,200,200)
         self.win.show()
